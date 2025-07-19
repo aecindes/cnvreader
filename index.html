@@ -41,7 +41,6 @@
 	}
 	
 	.scene-body {
-		/* remove any top margin/padding if you added some elsewhere */
 		margin-left: 12px;
 	}
 	
@@ -62,29 +61,29 @@
 	}
 
     .player {
-		color: #64afff; /* Player text color */
+		color: #64afff; 
     }
 
     .silent {
-		color: #DDDDDD; /* Silent text color */
+		color: #DDDDDD;
     }
 
     .link {
-        color: #707070; /* Linked text color */
-		font-style: italic; /* Style for end dialogue */
+        color: #707070;
+		font-style: italic;
     }
 
     .other {
-        color: #ff8282; /* Other speaker text color */
+        color: #ff8282;
     }
     
     .end-dialogue {
-        color: #707070; /* Color for end dialogue */
-        font-style: italic; /* Style for end dialogue */
+        color: #707070; 
+        font-style: italic; 
     }
 	
 	.child-nodes {
-		display: block; /* Default to expanded */
+		display: block; 
 		margin-left: 12px;
 		transition: max-height 0.3s ease-out;
 		overflow: hidden;
@@ -118,7 +117,6 @@
 </style>
 <h2 style="display: flex; justify-content: space-between; align-items: center; margin-left: 2%">Conversation Reader</h2>
 
-<!-- Header bar with file input and stopwatch -->
 <div style="display: flex; justify-content: space-between; align-items: center; margin: 0 2% 20px 2%;">
     <div style="display: flex; align-items: center;">
         <input type="file" id="fileInput" accept=".cnv" style="display: none;">
@@ -132,7 +130,6 @@
     </div>
 </div> 
 
-<!-- Content area -->
 <div id="content">
     <div id="placeholderWrapper" style="display: flex; justify-content: center; align-items: center; width: 100%;">
         <p id="placeholder" style="color: grey;">(Drag and drop a .cnv file here to read it)</p>
@@ -140,7 +137,6 @@
 </div>
 
 <script>
-// Stopwatch timer
 var timer = document.getElementById('timer');
 var toggleBtn = document.getElementById('startStop');
 var watch = new Stopwatch(timer);
@@ -211,23 +207,19 @@ toggleBtn.addEventListener('click', function() {
     }
 });
 
-// File input handling
 var fileInput = document.getElementById('fileInput');
 fileInput.addEventListener('change', handleFileSelect, false);
 
-// Drag-and-drop handling
 var dropZone = document.getElementById('content');
 dropZone.addEventListener('dragover', handleDragOver, false);
 dropZone.addEventListener('drop', handleFileSelect, false);
 
-// Function to handle file selection
 function handleFileSelect(evt) {
     evt.stopPropagation();
     evt.preventDefault();
 
     var files = evt.dataTransfer ? evt.dataTransfer.files : evt.target.files;
 
-    // Remove the placeholder
     var placeholderWrapper = document.getElementById('placeholderWrapper');
     if (placeholderWrapper) {
         placeholderWrapper.remove();
@@ -237,21 +229,19 @@ function handleFileSelect(evt) {
         contentDiv.style.alignItems = 'flex-start';
     }
 
-    // Set the file name for display and title bar
-    var fileNameElement = document.getElementById('fileName');
-    if (files.length > 0) {
-        fileNameElement.textContent = ' ' + files[0].name;
+	var fileNameElement = document.getElementById('fileName');
+	if (files.length > 0) {
+	fileNameElement.textContent = ' ' + files[0].name;
 
-        // Set the tab title to the file name (remove the file extension)
-        var fileNameWithoutExtension = files[0].name.replace(/\.[^/.]+$/, ""); // Remove extension
-        document.title = fileNameWithoutExtension;  // Set tab title immediately
+	var fileNameWithoutExtension = files[0].name.replace(/\.[^/.]+$/, ""); 
+	document.title = fileNameWithoutExtension;  
     }
 
     var reader = new FileReader();
     reader.onload = function(e) {
         try {
             var data = JSON.parse(e.target.result);
-            displayScenes(data.scenes); // Process scenes after file is loaded
+            displayScenes(data.scenes); 
         } catch (error) {
             console.error("Failed to parse JSON: ", error);
             alert("There was an error loading the file. Check the console for details.");
@@ -264,14 +254,12 @@ function createSpeakerFilter() {
   const old = document.getElementById('speakerFilter');
   if (old) old.remove();
 
-  // 1) collect unique speakers
   const nameSet = new Set();
   document.querySelectorAll('#content div span').forEach(span => {
     const m = span.textContent.match(/^\[(.+?)\]/);
     if (m) nameSet.add(m[1]);
   });
 
-  // 2) merge the two into one group if either exists
   const groupLabel = 'Jun Aslan & Player';
   if (nameSet.has('Jun Aslan') || nameSet.has('Player')) {
     nameSet.delete('Jun Aslan');
@@ -279,7 +267,6 @@ function createSpeakerFilter() {
     nameSet.add(groupLabel);
   }
 
-  // 3) build dropdown
   const filterContainer = document.createElement('div');
   filterContainer.id = 'speakerFilter';
   filterContainer.style.margin = '0 2px 10px';
@@ -296,15 +283,11 @@ function createSpeakerFilter() {
     select.appendChild(new Option(name, name));
   });
 
-  // 4) filter/fade logic
   select.addEventListener('change', () => {
     const chosen = select.value;
     document.querySelectorAll('#content div[id]:not(#speakerFilter)').forEach(lineEl => {
       const sp = lineEl.querySelector('strong')?.textContent || '';
-      // decide full opacity if:
-      //  - All selected
-      //  - exact match
-      //  - or chosen group and speaker is one of the two
+
       if (!chosen
         || sp === `[${chosen}]`
         || (chosen === groupLabel && (sp === '[Jun Aslan]' || sp === '[Player]'))
@@ -324,13 +307,12 @@ function createSpeakerFilter() {
 
 function displayScenes(scenes) {
   const contentDiv = document.getElementById('content');
-  contentDiv.innerHTML = '';             // clear old tree & dropdown
-
+  contentDiv.innerHTML = '';
+	
   if (scenes.length === 0) {
     document.title = 'Conversation Reader';
   }
 
-	// 1) Render all scenes
 	scenes.forEach(scene => {
 		const sceneWrapper = document.createElement('div');
 		sceneWrapper.classList.add('scene-wrapper');
@@ -352,21 +334,16 @@ function displayScenes(scenes) {
 		
 		contentDiv.appendChild(sceneWrapper);
 	});
-
-	// 2) Now build the speaker dropdown
 		createSpeakerFilter();
-
 }
 
 
-// Function to handle drag over event
 function handleDragOver(evt) {
     evt.stopPropagation();
     evt.preventDefault();
     evt.dataTransfer.dropEffect = 'copy';
 }
 
-// Function to handle angle brackets in text (escape < and >)
 function escapeAngleBrackets(text) {
     return text.replace(/<</g, '&lt;&lt;')  // Escape double left angle brackets
                .replace(/>>/g, '&gt;&gt;')  // Escape double right angle brackets
@@ -374,12 +351,10 @@ function escapeAngleBrackets(text) {
                .replace(/>/g, '&gt;');     // Escape single right angle bracket
 }
 
-// convert your custom tags to <em>
 function applyItalics(text) {
   return text.replace(/<Italic>([\s\S]*?)<\/>/g, '<em>$1</em>');
 }
 
-// Function to create a tree structure of the scene lines
 function createTree(nodes, parentElement, parentIdMap) {
     const nodeMap = nodes.reduce((map, node) => {
         map[node.id] = node;
@@ -388,16 +363,14 @@ function createTree(nodes, parentElement, parentIdMap) {
 
     const linkedNodes = {};
     const referencedNodeIds = new Set();
-    const arrowStateMap = new Map(); // true = collapsed, false = expanded
+    const arrowStateMap = new Map();
 
-    // Track referenced (linked) target nodes
     nodes.forEach(node => {
         if (node.nodeType === 'Link' && node.linkedNode?.referencedId) {
             referencedNodeIds.add(node.linkedNode.referencedId);
         }
     });
 
-    // Utility: get all descendant IDs for a node
     function getDescendants(nodeId) {
         const result = [];
         function collect(id) {
@@ -411,7 +384,6 @@ function createTree(nodes, parentElement, parentIdMap) {
         return result;
     }
 
-// Utility: sync arrow icon based on collapsed state
 function updateArrowIcons(descendantIds) {
   descendantIds.forEach(descId => {
     const descEl = document.getElementById(descId);
@@ -420,18 +392,13 @@ function updateArrowIcons(descendantIds) {
     const arrow = descEl.querySelector('span');
     if (!arrow) return;
 
-    // Detect link sources and targets
     const isLinkNode   = nodeMap[descId].nodeType === 'Link';
     const isTargetNode = referencedNodeIds.has(descId);
 
     if (isLinkNode) {
-      // Always show the link icon on the source of a link
       arrow.textContent = '🔗';
       return;
     }
-	
-
-    // Otherwise fall back to expand/collapse arrows
     const isCollapsed = arrowStateMap.get(descId) === true;
     const isVisible   = descEl.style.display !== 'none';
     arrow.textContent = (!isCollapsed && isVisible)
@@ -487,11 +454,9 @@ function updateArrowIcons(descendantIds) {
 		arrow.style.display = 'inline-block';
 		arrow.style.width = '1em';
 
-		// 1) decide the *initial* arrow icon:
 		if (node.nodeType === 'Link') {
 			arrow.textContent = '🔗';
 		} else {
-			// default to “expanded” ▼
 			arrow.textContent = '\u25BD';
 		}
 
@@ -501,13 +466,9 @@ function updateArrowIcons(descendantIds) {
 	if (node.nodeType === 'Line' && node.line?.text) {
 		const speakerName = node.line.speaker.name || 'Unknown';
 		
-		// 1) grab raw JSON text
 		const raw = node.line.text.rawText || '';
-		// 2) convert <Italic>…</> into real <em>…</em>
 		const withItalics = raw.replace(/<Italic>([\s\S]*?)<\/>/g, '<em>$1</em>');
-		// 3) escape all other angle-brackets
 		const escaped = escapeAngleBrackets(withItalics);
-		// 4) restore only our <em> tags so they render
 		const formatted = escaped
 		  .replace(/&lt;em&gt;/g, '<em>')
 		  .replace(/&lt;\/em&gt;/g, '</em>');
@@ -523,10 +484,8 @@ function updateArrowIcons(descendantIds) {
 				
 		let textToShow;
 			if (speakerName.toLowerCase() === 'silent') {
-				// for silent lines: no quotes
-				textToShow = formatted;
+			textToShow = formatted;
 			} else {
-				// for all others: wrap
 			textToShow = `"${formatted}"`;
 			}
 
@@ -545,7 +504,7 @@ function updateArrowIcons(descendantIds) {
 
 		if (comments.length > 0) {
 			const commentIcon = document.createElement('span');
-			commentIcon.innerHTML = '&#9432;'; // ℹ️ or use [note] if you want plain text
+			commentIcon.innerHTML = '&#9432;';
 			commentIcon.style.cursor = 'pointer';
 			commentIcon.title = 'View editor notes';
 			commentIcon.style.marginLeft = '10px';
@@ -601,14 +560,13 @@ function updateArrowIcons(descendantIds) {
 	}
 	header.appendChild(leftSide);
 
-	// Right side for the 💬 icon
 	if (commentBox) {
 		const rightSide = document.createElement('div');
 		rightSide.style.display = 'flex';
 		rightSide.style.alignItems = 'center';
 
 		const commentIcon = document.createElement('span');
-		commentIcon.innerHTML = '&#9432;'; // ℹ️ or use [note] if you want plain text
+		commentIcon.innerHTML = '&#9432;';
 		commentIcon.style.cursor = 'pointer';
 		commentIcon.title = 'View editor notes';
 		commentIcon.style.marginLeft = '10px';
@@ -626,11 +584,9 @@ function updateArrowIcons(descendantIds) {
 		rightSide.appendChild(commentIcon);
 		header.appendChild(rightSide);
 
-		// Attach both header and comment box
 		el.appendChild(header);
 		el.appendChild(commentBox);
 	} else {
-		// Just attach the header if no comments
 		el.appendChild(header);
 	}
 
