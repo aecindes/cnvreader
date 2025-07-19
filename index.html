@@ -1,0 +1,714 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Conversation Reader</title>
+</head>
+<body>
+<style>
+    div {
+        font-size: 18px; 
+        line-height: 2; 
+        font-family: Roboto, sans-serif; 
+    }
+    
+    body {
+        background-color: #1A1A1A;
+        margin: 10px;
+        color: #fff;
+        width: calc(100vw - 10px);
+        overflow: auto;
+        font-family: Roboto, sans-serif;
+        box-sizing: border-box;
+    }
+
+    #content {
+		padding: 20px;
+		min-height: calc(100vh - 6em - 20px);
+		min-width: calc(100vw - 20px);
+		background-color: rgba(0, 0, 0, 0.5);
+		border: none;
+		box-sizing: border-box;
+		white-space: nowrap;
+		min-width: max-content;
+
+    }
+	
+	.scene-header {
+		cursor: pointer;
+		user-select: none;
+		margin-bottom: 2px;
+		margin-left: 0px;
+	}
+	
+	.scene-body {
+		/* remove any top margin/padding if you added some elsewhere */
+		margin-left: 12px;
+	}
+	
+	.scene-wrapper.collapsed .scene-body {
+		display: none;
+	}
+	
+	.scene-header::before {
+	  content: "▽";
+	  display: inline-block;
+	  transition: transform 0.2s ease;
+	  padding-right: 8px;
+	  font-size: 18px; 
+	}
+
+	.scene-wrapper.collapsed .scene-header::before {
+		content: "► ";
+	}
+
+    .player {
+		color: #64afff; /* Player text color */
+    }
+
+    .silent {
+		color: #DDDDDD; /* Silent text color */
+    }
+
+    .link {
+        color: #707070; /* Linked text color */
+		font-style: italic; /* Style for end dialogue */
+    }
+
+    .other {
+        color: #ff8282; /* Other speaker text color */
+    }
+    
+    .end-dialogue {
+        color: #707070; /* Color for end dialogue */
+        font-style: italic; /* Style for end dialogue */
+    }
+	
+	.child-nodes {
+		display: block; /* Default to expanded */
+		margin-left: 12px;
+		transition: max-height 0.3s ease-out;
+		overflow: hidden;
+	}
+	
+	.highlight-hover {
+		background-color: rgba(255, 255, 255, 0.1);
+		border-radius: 4px;
+		transition: background-color 0.2s ease;
+	}
+
+	.linked-highlight {
+		background-color: rgba(255, 255, 255, 0.125);
+		border-radius: 4px;
+	}
+	
+	.simple-id {
+		opacity: 0;
+		color: #888;
+		margin-left: 12px;
+        font-size: 18px; 
+	}
+
+	.line-node:hover .simple-id {
+		opacity: 0.75;
+		margin-left: 12px;
+		font-size: 18px; 
+
+	}
+  
+</style>
+<h2 style="display: flex; justify-content: space-between; align-items: center; margin-left: 2%">Conversation Reader</h2>
+
+<!-- Header bar with file input and stopwatch -->
+<div style="display: flex; justify-content: space-between; align-items: center; margin: 0 2% 20px 2%;">
+    <div style="display: flex; align-items: center;">
+        <input type="file" id="fileInput" accept=".cnv" style="display: none;">
+        <label for="fileInput" style="cursor: pointer; padding: 10px; background-color: #4CAF50; color: white; border: none; border-radius: 4px;">Choose .cnv to Read</label>
+        <span id="fileName" style="margin-left: 10px;"></span>
+    </div>
+
+    <div id="stopwatch" style="display: flex; align-items: center;">
+        <button id="startStop" style="cursor: pointer; padding: 17px 10px; background-color: #4CAF50; color: white; border: none; border-radius: 4px; margin-right: 10px; font-size: 18px;">Start Timer</button>
+        <span id="timer">00:00</span>
+    </div>
+</div> 
+
+<!-- Content area -->
+<div id="content">
+    <div id="placeholderWrapper" style="display: flex; justify-content: center; align-items: center; width: 100%;">
+        <p id="placeholder" style="color: grey;">(Drag and drop a .cnv file here to read it)</p>
+    </div>
+</div>
+
+<script>
+// Stopwatch timer
+var timer = document.getElementById('timer');
+var toggleBtn = document.getElementById('startStop');
+var watch = new Stopwatch(timer);
+
+function Stopwatch(element) {
+    var time = 0;
+    var interval;
+    var offset;
+
+    function update() {
+        if (this.isOn) {
+            time += delta();
+        }
+
+        var formattedTime = timeFormatter(time);
+        element.textContent = formattedTime;
+    }
+
+    function delta() {
+        var now = Date.now();
+        var timePassed = now - offset;
+        offset = now;
+        return timePassed;
+    }
+
+    function timeFormatter(timeInMilliseconds) {
+        var time = new Date(timeInMilliseconds);
+        var minutes = time.getMinutes().toString();
+        var seconds = time.getSeconds().toString();
+
+        if (minutes.length < 2) {
+            minutes = '0' + minutes;
+        }
+
+        if (seconds.length < 2) {
+            seconds = '0' + seconds;
+        }
+
+        return minutes + ':' + seconds;
+    }
+
+    this.isOn = false;
+
+    this.start = function() {
+        if (!this.isOn) {
+            interval = setInterval(update.bind(this), 10);
+            offset = Date.now();
+            this.isOn = true;
+        }
+    };
+
+    this.stop = function() {
+        if (this.isOn) {
+            clearInterval(interval);
+            interval = null;
+            this.isOn = false;
+        }
+    };
+}
+
+toggleBtn.addEventListener('click', function() {
+    if (watch.isOn) {
+        watch.stop();
+        this.textContent = 'Start Timer';
+    } else {
+        watch.start();
+        this.textContent = 'Stop Timer';
+    }
+});
+
+// File input handling
+var fileInput = document.getElementById('fileInput');
+fileInput.addEventListener('change', handleFileSelect, false);
+
+// Drag-and-drop handling
+var dropZone = document.getElementById('content');
+dropZone.addEventListener('dragover', handleDragOver, false);
+dropZone.addEventListener('drop', handleFileSelect, false);
+
+// Function to handle file selection
+function handleFileSelect(evt) {
+    evt.stopPropagation();
+    evt.preventDefault();
+
+    var files = evt.dataTransfer ? evt.dataTransfer.files : evt.target.files;
+
+    // Remove the placeholder
+    var placeholderWrapper = document.getElementById('placeholderWrapper');
+    if (placeholderWrapper) {
+        placeholderWrapper.remove();
+        var contentDiv = document.getElementById('content');
+        contentDiv.style.display = 'block';
+        contentDiv.style.justifyContent = 'flex-start';
+        contentDiv.style.alignItems = 'flex-start';
+    }
+
+    // Set the file name for display and title bar
+    var fileNameElement = document.getElementById('fileName');
+    if (files.length > 0) {
+        fileNameElement.textContent = ' ' + files[0].name;
+
+        // Set the tab title to the file name (remove the file extension)
+        var fileNameWithoutExtension = files[0].name.replace(/\.[^/.]+$/, ""); // Remove extension
+        document.title = fileNameWithoutExtension;  // Set tab title immediately
+    }
+
+    var reader = new FileReader();
+    reader.onload = function(e) {
+        try {
+            var data = JSON.parse(e.target.result);
+            displayScenes(data.scenes); // Process scenes after file is loaded
+        } catch (error) {
+            console.error("Failed to parse JSON: ", error);
+            alert("There was an error loading the file. Check the console for details.");
+        }
+    };
+    reader.readAsText(files[0]);
+}
+
+function createSpeakerFilter() {
+  const old = document.getElementById('speakerFilter');
+  if (old) old.remove();
+
+  // 1) collect unique speakers
+  const nameSet = new Set();
+  document.querySelectorAll('#content div span').forEach(span => {
+    const m = span.textContent.match(/^\[(.+?)\]/);
+    if (m) nameSet.add(m[1]);
+  });
+
+  // 2) merge the two into one group if either exists
+  const groupLabel = 'Jun Aslan & Player';
+  if (nameSet.has('Jun Aslan') || nameSet.has('Player')) {
+    nameSet.delete('Jun Aslan');
+    nameSet.delete('Player');
+    nameSet.add(groupLabel);
+  }
+
+  // 3) build dropdown
+  const filterContainer = document.createElement('div');
+  filterContainer.id = 'speakerFilter';
+  filterContainer.style.margin = '0 2px 10px';
+  filterContainer.style.color = '#fff';
+
+  const label = document.createElement('label');
+  label.textContent = 'Focus Speaker: ';
+  label.style.marginRight = '8px';
+  filterContainer.appendChild(label);
+
+  const select = document.createElement('select');
+  select.appendChild(new Option('All', ''));
+  Array.from(nameSet).sort().forEach(name => {
+    select.appendChild(new Option(name, name));
+  });
+
+  // 4) filter/fade logic
+  select.addEventListener('change', () => {
+    const chosen = select.value;
+    document.querySelectorAll('#content div[id]:not(#speakerFilter)').forEach(lineEl => {
+      const sp = lineEl.querySelector('strong')?.textContent || '';
+      // decide full opacity if:
+      //  - All selected
+      //  - exact match
+      //  - or chosen group and speaker is one of the two
+      if (!chosen
+        || sp === `[${chosen}]`
+        || (chosen === groupLabel && (sp === '[Jun Aslan]' || sp === '[Player]'))
+      ) {
+        lineEl.style.display = 'block';
+        lineEl.style.opacity = '1';
+      } else {
+        lineEl.style.display = 'block';
+        lineEl.style.opacity = '0.25';
+      }
+    });
+  });
+
+  filterContainer.appendChild(select);
+  document.getElementById('content').prepend(filterContainer);
+}
+
+function displayScenes(scenes) {
+  const contentDiv = document.getElementById('content');
+  contentDiv.innerHTML = '';             // clear old tree & dropdown
+
+  if (scenes.length === 0) {
+    document.title = 'Conversation Reader';
+  }
+
+	// 1) Render all scenes
+	scenes.forEach(scene => {
+		const sceneWrapper = document.createElement('div');
+		sceneWrapper.classList.add('scene-wrapper');
+	  
+		const header = document.createElement('h3');
+		header.textContent = `Scene: ${scene.name}`;
+		header.classList.add('scene-header');
+		sceneWrapper.appendChild(header);
+		
+		header.addEventListener('click', () => {
+		sceneWrapper.classList.toggle('collapsed');
+	});
+		
+		const body = document.createElement('div');
+		body.classList.add('scene-body');
+		sceneWrapper.appendChild(body);
+		
+		createTree(scene.nodes, body, {});
+		
+		contentDiv.appendChild(sceneWrapper);
+	});
+
+	// 2) Now build the speaker dropdown
+		createSpeakerFilter();
+
+}
+
+
+// Function to handle drag over event
+function handleDragOver(evt) {
+    evt.stopPropagation();
+    evt.preventDefault();
+    evt.dataTransfer.dropEffect = 'copy';
+}
+
+// Function to handle angle brackets in text (escape < and >)
+function escapeAngleBrackets(text) {
+    return text.replace(/<</g, '&lt;&lt;')  // Escape double left angle brackets
+               .replace(/>>/g, '&gt;&gt;')  // Escape double right angle brackets
+               .replace(/</g, '&lt;')      // Escape single left angle bracket
+               .replace(/>/g, '&gt;');     // Escape single right angle bracket
+}
+
+// convert your custom tags to <em>
+function applyItalics(text) {
+  return text.replace(/<Italic>([\s\S]*?)<\/>/g, '<em>$1</em>');
+}
+
+// Function to create a tree structure of the scene lines
+function createTree(nodes, parentElement, parentIdMap) {
+    const nodeMap = nodes.reduce((map, node) => {
+        map[node.id] = node;
+        return map;
+    }, {});
+
+    const linkedNodes = {};
+    const referencedNodeIds = new Set();
+    const arrowStateMap = new Map(); // true = collapsed, false = expanded
+
+    // Track referenced (linked) target nodes
+    nodes.forEach(node => {
+        if (node.nodeType === 'Link' && node.linkedNode?.referencedId) {
+            referencedNodeIds.add(node.linkedNode.referencedId);
+        }
+    });
+
+    // Utility: get all descendant IDs for a node
+    function getDescendants(nodeId) {
+        const result = [];
+        function collect(id) {
+            const children = nodes.filter(n => n.parentId === id);
+            for (const child of children) {
+                result.push(child.id);
+                collect(child.id);
+            }
+        }
+        collect(nodeId);
+        return result;
+    }
+
+// Utility: sync arrow icon based on collapsed state
+function updateArrowIcons(descendantIds) {
+  descendantIds.forEach(descId => {
+    const descEl = document.getElementById(descId);
+    if (!descEl) return;
+
+    const arrow = descEl.querySelector('span');
+    if (!arrow) return;
+
+    // Detect link sources and targets
+    const isLinkNode   = nodeMap[descId].nodeType === 'Link';
+    const isTargetNode = referencedNodeIds.has(descId);
+
+    if (isLinkNode) {
+      // Always show the link icon on the source of a link
+      arrow.textContent = '🔗';
+      return;
+    }
+	
+
+    // Otherwise fall back to expand/collapse arrows
+    const isCollapsed = arrowStateMap.get(descId) === true;
+    const isVisible   = descEl.style.display !== 'none';
+    arrow.textContent = (!isCollapsed && isVisible)
+      ? '\u25BD'  // ▼ \u25BC
+      : '\u25B6'; // ► \u25B6
+  });
+}
+
+	function processNode(nodeId, level) {
+		const node = nodeMap[nodeId];
+		
+		if (!node || node.processed) return;
+			node.processed = true;
+
+			const el = document.createElement('div');
+			el.classList.add('line-node');
+			el.id = nodeId;
+			el.dataset.parentId = node.parentId;
+			el.style.marginLeft = (level * 14) + 'px';
+			el.style.display = 'block';
+			
+			el.addEventListener('mouseenter', () => {
+			el.classList.add('highlight-hover');
+
+		if (node.nodeType === 'Link' && node.linkedNode?.referencedId) {
+			const targetId = node.linkedNode.referencedId;
+			const targetEl = document.getElementById(targetId);
+        if (targetEl) targetEl.classList.add('linked-highlight');
+    }
+});
+
+	el.addEventListener('mouseleave', () => {
+    el.classList.remove('highlight-hover');
+		if (node.nodeType === 'Link' && node.linkedNode?.referencedId) {
+		  const targetId = node.linkedNode.referencedId;
+		  const targetEl = document.getElementById(targetId);
+		if (targetEl) targetEl.classList.remove('linked-highlight');
+	}
+});
+
+		const header = document.createElement('div');
+		header.style.display = 'flex';
+		header.style.alignItems = 'center';
+		header.style.justifyContent = 'flex-start';
+
+		const leftSide = document.createElement('div');
+		leftSide.style.display = 'flex';
+		leftSide.style.alignItems = 'center';
+
+		const arrow = document.createElement('span');
+		arrow.style.cursor = 'pointer';
+		arrow.style.marginRight = '10px';
+		arrow.style.display = 'inline-block';
+		arrow.style.width = '1em';
+
+		// 1) decide the *initial* arrow icon:
+		if (node.nodeType === 'Link') {
+			arrow.textContent = '🔗';
+		} else {
+			// default to “expanded” ▼
+			arrow.textContent = '\u25BD';
+		}
+
+		const content = document.createElement('span');
+		let commentBox = null;
+
+	if (node.nodeType === 'Line' && node.line?.text) {
+		const speakerName = node.line.speaker.name || 'Unknown';
+		
+		// 1) grab raw JSON text
+		const raw = node.line.text.rawText || '';
+		// 2) convert <Italic>…</> into real <em>…</em>
+		const withItalics = raw.replace(/<Italic>([\s\S]*?)<\/>/g, '<em>$1</em>');
+		// 3) escape all other angle-brackets
+		const escaped = escapeAngleBrackets(withItalics);
+		// 4) restore only our <em> tags so they render
+		const formatted = escaped
+		  .replace(/&lt;em&gt;/g, '<em>')
+		  .replace(/&lt;\/em&gt;/g, '</em>');
+		  
+		const paraphrase = node.line.paraphrase ? ` (${node.line.paraphrase})` : '';
+
+		const rawNotes = node.line.editorData?.editorNotes;
+		const comments = Array.isArray(rawNotes)
+			? rawNotes.filter(c => typeof c === 'string' && c.trim() !== '')
+			: (typeof rawNotes === 'string' && rawNotes.trim() !== '')
+				? [rawNotes.trim()]
+				: [];
+				
+		let textToShow;
+			if (speakerName.toLowerCase() === 'silent') {
+				// for silent lines: no quotes
+				textToShow = formatted;
+			} else {
+				// for all others: wrap
+			textToShow = `"${formatted}"`;
+			}
+
+		if (formatted === '' && paraphrase === '') return;
+
+			content.innerHTML = formatted === ''
+				? `<strong>[${speakerName}]</strong>:${paraphrase}`
+				: `<strong>[${speakerName}]</strong>:${paraphrase} ${textToShow}`;
+
+			el.classList.remove('player', 'silent', 'other');
+			el.classList.add(
+			  speakerName.toLowerCase() === 'player' ? 'player'
+				: speakerName.toLowerCase() === 'silent' ? 'silent'
+				: 'other'
+			);
+
+		if (comments.length > 0) {
+			const commentIcon = document.createElement('span');
+			commentIcon.innerHTML = '&#9432;'; // ℹ️ or use [note] if you want plain text
+			commentIcon.style.cursor = 'pointer';
+			commentIcon.title = 'View editor notes';
+			commentIcon.style.marginLeft = '10px';
+
+			commentIcon.addEventListener('mouseenter', () => {
+				commentIcon.style.color = '#4CAF50';
+			});
+			commentIcon.addEventListener('mouseleave', () => {
+				commentIcon.style.color = '';
+			});
+
+			commentBox = document.createElement('div');
+			commentBox.style.display = 'none';
+			commentBox.style.background = '#222';
+			commentBox.style.border = '1px solid #555';
+			commentBox.style.padding = '8px 12px';
+			commentBox.style.marginTop = '6px';
+			commentBox.style.borderRadius = '6px';
+			commentBox.style.color = '#ccc';
+			commentBox.style.fontSize = '0.95em';
+			commentBox.style.boxShadow = '0 2px 6px rgba(0,0,0,0.4)';
+
+			commentBox.innerHTML = comments.map(c =>
+				`<div style="margin-bottom: 6px;">• ${escapeAngleBrackets(typeof c === 'string' ? c : c.text || '').replace(/\r?\n/g, '<br>&nbsp;&nbsp;')}</div>`
+			).join('');
+
+			commentIcon.addEventListener('click', () => {
+				commentBox.style.display = commentBox.style.display === 'none' ? 'block' : 'none';
+			});
+
+		}
+	} else if (node.nodeType === 'Link' && node.linkedNode?.referencedId) {
+		const linkedNode = nodeMap[node.linkedNode.referencedId];
+		if (linkedNode?.line?.text?.rawText) {
+			const linkedText = escapeAngleBrackets(linkedNode.line.text.rawText);
+			const linkedSpeaker = linkedNode.line.speaker.name || 'Silent';
+			content.innerHTML = `<strong>[${linkedSpeaker}]</strong>: "${linkedText}"`;
+			el.className = 'link';
+
+			if (!linkedNodes[nodeId]) linkedNodes[nodeId] = [];
+			linkedNodes[nodeId].push(linkedNode.id);
+		}
+	}
+
+	leftSide.appendChild(arrow);
+	leftSide.appendChild(content);
+	
+	if (node.simpleId != null) {
+		const idSpan = document.createElement('span');
+		idSpan.className = 'simple-id';
+		idSpan.textContent = ` [${node.simpleId}]`;
+		leftSide.appendChild(idSpan);
+	}
+	header.appendChild(leftSide);
+
+	// Right side for the 💬 icon
+	if (commentBox) {
+		const rightSide = document.createElement('div');
+		rightSide.style.display = 'flex';
+		rightSide.style.alignItems = 'center';
+
+		const commentIcon = document.createElement('span');
+		commentIcon.innerHTML = '&#9432;'; // ℹ️ or use [note] if you want plain text
+		commentIcon.style.cursor = 'pointer';
+		commentIcon.title = 'View editor notes';
+		commentIcon.style.marginLeft = '10px';
+
+		commentIcon.addEventListener('mouseenter', () => {
+			commentIcon.style.color = '#4CAF50';
+		});
+		commentIcon.addEventListener('mouseleave', () => {
+			commentIcon.style.color = '';
+		});
+		commentIcon.addEventListener('click', () => {
+			commentBox.style.display = commentBox.style.display === 'none' ? 'block' : 'none';
+		});
+
+		rightSide.appendChild(commentIcon);
+		header.appendChild(rightSide);
+
+		// Attach both header and comment box
+		el.appendChild(header);
+		el.appendChild(commentBox);
+	} else {
+		// Just attach the header if no comments
+		el.appendChild(header);
+	}
+
+	const childNodesContainer = document.createElement('div');
+	childNodesContainer.className = 'child-nodes';
+	childNodesContainer.style.display = 'block';
+	el.appendChild(childNodesContainer);
+
+	arrow.addEventListener('click', function () {
+		const currentlyCollapsed = arrowStateMap.get(nodeId) === true;
+		const shouldCollapse = !currentlyCollapsed;
+		arrowStateMap.set(nodeId, shouldCollapse);
+		
+		arrowStateMap.set(nodeId, shouldCollapse);
+			arrow.innerHTML = shouldCollapse ? '&#9654;' : '&#9660;';
+
+		const descendants = getDescendants(nodeId);
+		descendants.forEach(descId => {
+			const descEl = document.getElementById(descId);
+			if (!descEl) return;
+
+			const parentChain = [];
+			let current = nodeMap[descId];
+			while (current && current.parentId) {
+				parentChain.push(current.parentId);
+				current = nodeMap[current.parentId];
+			}
+
+			const parentCollapsed = parentChain.some(p => arrowStateMap.get(p) === true);
+
+			if (shouldCollapse) {
+				descEl.style.display = 'none';
+			} else {
+				if (!parentCollapsed) {
+					descEl.style.display = 'block';
+				}
+			}
+		});
+		
+
+		if (!shouldCollapse && linkedNodes[nodeId]) {
+			linkedNodes[nodeId].forEach(linkedId => {
+				const linkedEl = document.getElementById(linkedId);
+				const parentVisible = nodeMap[linkedId]?.parentId
+					? document.getElementById(nodeMap[linkedId].parentId)?.style.display !== 'none'
+					: true;
+				if (linkedEl && parentVisible) {
+					linkedEl.style.display = 'block';
+				}
+			});
+		}
+
+		updateArrowIcons([nodeId, ...descendants]);
+	});
+
+	parentElement.appendChild(el);
+
+	const children = nodes.filter(n => n.parentId === nodeId);
+	children.forEach(child => {
+		processNode(child.id, level + 1);
+	});
+
+	if (children.length === 0 && node.nodeType !== 'Link') {
+		const endEl = document.createElement('div');
+		endEl.className = 'end-dialogue';
+		endEl.style.marginLeft = (level + 1) + 'px';
+		endEl.innerHTML = '[End of Scene]';
+		childNodesContainer.appendChild(endEl);
+	}
+}
+    nodes.forEach(node => {
+        if (!parentIdMap[node.id]) {
+            processNode(node.id, 0);
+        }
+    });
+}
+
+
+</script>
+</body>
+</html>
